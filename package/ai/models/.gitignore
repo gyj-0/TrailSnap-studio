@@ -1,0 +1,29 @@
+# 忽略所有模型文件
+*
+
+# 保留 .gitignore 本身
+!.gitignore
+
+# 保留 README
+!README.md
+
+# 忽略常见模型文件格式
+*.pt
+*.pth
+*.onnx
+*.trt
+*.engine
+*.plan
+*.weights
+*.h5
+*.pb
+*.savedmodel
+*.tflite
+*.mlmodel
+*.caffemodel
+*.pkl
+*.pickle
+*.joblib
+
+# 忽略模型目录
+*/

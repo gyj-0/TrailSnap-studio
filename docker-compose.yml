@@ -1,0 +1,122 @@
+version: "3.9"
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:16-alpine
+    container_name: trailsnap-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-trailsnap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trailsnap_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-trailsnap}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trailsnap} -d ${POSTGRES_DB:-trailsnap}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - trailsnap-network
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: trailsnap-redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - trailsnap-network
+
+  # 后端 API 服务
+  server:
+    build:
+      context: ./package/server
+      dockerfile: Dockerfile
+    container_name: trailsnap-server
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-trailsnap}:${POSTGRES_PASSWORD:-trailsnap_secret}@postgres:5432/${POSTGRES_DB:-trailsnap}
+      - REDIS_URL=redis://redis:6379/0
+      - AI_SERVICE_URL=http://ai:8001
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - DEBUG=${DEBUG:-false}
+    volumes:
+      - ./package/server:/app
+      - uploads_data:/app/uploads
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - trailsnap-network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # AI 微服务
+  ai:
+    build:
+      context: ./package/ai
+      dockerfile: Dockerfile
+    container_name: trailsnap-ai
+    environment:
+      - MODEL_PATH=/app/models
+      - DEVICE=${AI_DEVICE:-cpu}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./package/ai:/app
+      - model_data:/app/models
+      - uploads_data:/app/uploads:ro
+    ports:
+      - "8001:8001"
+    networks:
+      - trailsnap-network
+    # GPU 支持（需要 nvidia-docker2）
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+
+  # 前端应用
+  website:
+    build:
+      context: ./package/website
+      dockerfile: Dockerfile
+    container_name: trailsnap-website
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_AI_BASE_URL=http://localhost:8001
+    volumes:
+      - ./package/website:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server
+    networks:
+      - trailsnap-network
+    command: npm run dev -- --host 0.0.0.0 --port 3000
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
+  model_data:
+
+networks:
+  trailsnap-network:
+    driver: bridge
