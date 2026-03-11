@@ -1,4 +1,4 @@
-# TrailSnap
+# TrailSnap Studio
 
 TrailSnap 是一个基于前后端分离架构的智能照片管理与票据识别系统。
 
@@ -189,5 +189,5 @@ package/ai/
 
 ## 联系方式
 
-- 项目主页: https://github.com/yourusername/trailsnap
-- 问题反馈: https://github.com/yourusername/trailsnap/issues
+- 项目主页: https://github.com/gyj-0/TrailSnap-studio
+- 问题反馈: https://github.com/gyj-0/TrailSnap-studio/issues
